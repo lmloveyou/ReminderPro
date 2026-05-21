@@ -1,4 +1,8 @@
 const storageKey = "reminderpro.reminders";
+const syncStatus = {
+  enabled: false,
+  syncing: false
+};
 
 const form = document.querySelector("#reminderForm");
 const calendarGrid = document.querySelector("#calendarGrid");
@@ -34,6 +38,7 @@ const notifiedReminderIds = new Set();
 
 setDefaultDateTime();
 render();
+syncFromServer();
 setInterval(checkNotifications, 30000);
 registerServiceWorker();
 
@@ -133,6 +138,52 @@ function loadReminders() {
 
 function saveReminders() {
   localStorage.setItem(storageKey, JSON.stringify(reminders));
+  syncToServer();
+}
+
+async function syncFromServer() {
+  try {
+    const response = await fetch("/api/reminders");
+    if (!response.ok) return;
+
+    const data = await response.json();
+    if (!Array.isArray(data.reminders)) return;
+
+    syncStatus.enabled = true;
+    reminders = mergeReminders(data.reminders, reminders);
+    localStorage.setItem(storageKey, JSON.stringify(reminders));
+    render();
+    await syncToServer();
+  } catch {
+    syncStatus.enabled = false;
+  }
+}
+
+async function syncToServer() {
+  if (syncStatus.syncing) return;
+  syncStatus.syncing = true;
+
+  try {
+    const response = await fetch("/api/reminders/sync", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ reminders })
+    });
+    if (!response.ok) return;
+
+    const data = await response.json();
+    if (Array.isArray(data.reminders)) {
+      syncStatus.enabled = true;
+      reminders = mergeReminders(reminders, data.reminders);
+      localStorage.setItem(storageKey, JSON.stringify(reminders));
+    }
+  } catch {
+    syncStatus.enabled = false;
+  } finally {
+    syncStatus.syncing = false;
+  }
 }
 
 function exportReminders() {
@@ -176,7 +227,9 @@ function mergeReminders(currentReminders, importedReminders) {
   const byId = new Map(currentReminders.map((item) => [item.id, item]));
   importedReminders.forEach((item) => {
     const id = item.id || crypto.randomUUID();
+    const existing = byId.get(id) || {};
     byId.set(id, {
+      ...existing,
       id,
       title: String(item.title || "").trim(),
       type: item.type || "task",
@@ -188,8 +241,9 @@ function mergeReminders(currentReminders, importedReminders) {
       notes: item.notes || "",
       channels: Array.isArray(item.channels) ? item.channels : ["app"],
       done: Boolean(item.done),
-      createdAt: item.createdAt || new Date().toISOString(),
-      updatedAt: item.updatedAt
+      createdAt: item.createdAt || existing.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || existing.updatedAt,
+      sentNotifications: item.sentNotifications || existing.sentNotifications || {}
     });
   });
   return [...byId.values()];

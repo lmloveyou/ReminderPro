@@ -34,6 +34,21 @@ Railway can use:
 - Start command: `npm start`
 - Health check path: `/health`
 
+Add these Railway variables to enable automatic email and SMS reminders:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
+
+Optional:
+
+- `DATA_DIR` for the reminder JSON file location, useful with a Railway volume.
+- `NOTIFICATION_INTERVAL_MS` to change how often the server checks reminders. Default: `60000`.
+
+Email reminders use Resend's server API. SMS reminders use Twilio's Messages API. Keep all keys only in Railway variables, never in frontend files.
+
 ## MVP
 
 - Add tasks and appointments with a date and time.
