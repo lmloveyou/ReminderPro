@@ -10,6 +10,14 @@ This first version is a static web app. It stores reminders in the browser with 
 
 Open `index.html` in a browser to try it.
 
+Current features:
+
+- Create, edit, complete, and delete reminders.
+- Search reminders by title, type, notes, email, or phone.
+- Filter by all, open, due soon, overdue, or done.
+- See reminder counts for open, due soon, overdue, and done items.
+- Open email and SMS drafts from a reminder.
+
 ## MVP
 
 - Add tasks and appointments with a date and time.

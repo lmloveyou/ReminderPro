@@ -5,9 +5,13 @@ const calendarGrid = document.querySelector("#calendarGrid");
 const reminderList = document.querySelector("#reminderList");
 const emptyState = document.querySelector("#emptyState");
 const filter = document.querySelector("#filter");
+const search = document.querySelector("#search");
 const notificationButton = document.querySelector("#notificationButton");
+const submitButton = document.querySelector("#submitButton");
+const cancelEditButton = document.querySelector("#cancelEditButton");
 
 const fields = {
+  editingId: document.querySelector("#editingId"),
   title: document.querySelector("#title"),
   type: document.querySelector("#type"),
   leadTime: document.querySelector("#leadTime"),
@@ -36,8 +40,7 @@ form.addEventListener("submit", (event) => {
   if (fields.channelEmail.checked) channels.push("email");
   if (fields.channelSms.checked) channels.push("sms");
 
-  const reminder = {
-    id: crypto.randomUUID(),
+  const reminderData = {
     title: fields.title.value.trim(),
     type: fields.type.value,
     leadTime: Number(fields.leadTime.value),
@@ -46,20 +49,35 @@ form.addEventListener("submit", (event) => {
     email: fields.email.value.trim(),
     phone: fields.phone.value.trim(),
     notes: fields.notes.value.trim(),
-    channels,
-    done: false,
-    createdAt: new Date().toISOString()
+    channels
   };
 
-  reminders = [reminder, ...reminders];
+  if (fields.editingId.value) {
+    reminders = reminders.map((item) => {
+      if (item.id !== fields.editingId.value) return item;
+      return {
+        ...item,
+        ...reminderData,
+        updatedAt: new Date().toISOString()
+      };
+    });
+  } else {
+    reminders = [{
+      id: crypto.randomUUID(),
+      ...reminderData,
+      done: false,
+      createdAt: new Date().toISOString()
+    }, ...reminders];
+  }
+
   saveReminders();
-  form.reset();
-  setDefaultDateTime();
-  fields.channelApp.checked = true;
+  resetForm();
   render();
 });
 
 filter.addEventListener("change", render);
+search.addEventListener("input", render);
+cancelEditButton.addEventListener("click", resetForm);
 
 notificationButton.addEventListener("click", async () => {
   if (!("Notification" in window)) {
@@ -81,6 +99,11 @@ reminderList.addEventListener("click", (event) => {
 
   if (button.dataset.action === "toggle") {
     reminder.done = !reminder.done;
+  }
+
+  if (button.dataset.action === "edit") {
+    startEdit(reminder);
+    return;
   }
 
   if (button.dataset.action === "delete") {
@@ -110,6 +133,35 @@ function setDefaultDateTime() {
   fields.time.value = `${String(nextHour.getHours()).padStart(2, "0")}:00`;
 }
 
+function resetForm() {
+  form.reset();
+  fields.editingId.value = "";
+  fields.channelApp.checked = true;
+  submitButton.textContent = "Add reminder";
+  cancelEditButton.classList.add("hidden");
+  document.querySelector("#formTitle").textContent = "Add something important";
+  setDefaultDateTime();
+}
+
+function startEdit(reminder) {
+  fields.editingId.value = reminder.id;
+  fields.title.value = reminder.title;
+  fields.type.value = reminder.type;
+  fields.leadTime.value = String(reminder.leadTime);
+  fields.date.value = reminder.date;
+  fields.time.value = reminder.time;
+  fields.email.value = reminder.email;
+  fields.phone.value = reminder.phone;
+  fields.notes.value = reminder.notes;
+  fields.channelApp.checked = reminder.channels.includes("app");
+  fields.channelEmail.checked = reminder.channels.includes("email");
+  fields.channelSms.checked = reminder.channels.includes("sms");
+  submitButton.textContent = "Save changes";
+  cancelEditButton.classList.remove("hidden");
+  document.querySelector("#formTitle").textContent = "Edit reminder";
+  fields.title.focus();
+}
+
 function render() {
   const sorted = [...reminders].sort((a, b) => getDueDate(a) - getDueDate(b));
   renderStats(sorted);
@@ -122,6 +174,7 @@ function renderStats(items) {
   const open = items.filter((item) => !item.done);
   document.querySelector("#openCount").textContent = open.length;
   document.querySelector("#dueSoonCount").textContent = open.filter(isDueSoon).length;
+  document.querySelector("#overdueCount").textContent = open.filter(isOverdue).length;
   document.querySelector("#doneCount").textContent = items.filter((item) => item.done).length;
 }
 
@@ -158,6 +211,7 @@ function renderList(items) {
   reminderList.innerHTML = visibleItems.map((item) => {
     const dueDate = getDueDate(item);
     const dueSoon = isDueSoon(item);
+    const overdue = isOverdue(item);
     const channels = item.channels.map((channel) => `<span class="badge">${channel.toUpperCase()}</span>`).join("");
     const emailLink = item.email
       ? `<a class="action-button" href="${buildMailto(item)}">Email</a>`
@@ -167,13 +221,14 @@ function renderList(items) {
       : "";
 
     return `
-      <article class="reminder-card ${item.done ? "done" : ""} ${dueSoon ? "due-soon" : ""}">
+      <article class="reminder-card ${item.done ? "done" : ""} ${dueSoon ? "due-soon" : ""} ${overdue ? "overdue" : ""}">
         <div>
           <h3 class="reminder-title">${escapeHtml(item.title)}</h3>
           <p class="meta">${escapeHtml(item.type)} - ${formatDateTime(dueDate)} - warning ${formatLeadTime(item.leadTime)}</p>
           ${item.notes ? `<p class="notes">${escapeHtml(item.notes)}</p>` : ""}
           <div class="badge-row">
             ${dueSoon && !item.done ? '<span class="badge alert">DUE SOON</span>' : ""}
+            ${overdue && !item.done ? '<span class="badge danger">OVERDUE</span>' : ""}
             ${channels}
           </div>
         </div>
@@ -183,6 +238,7 @@ function renderList(items) {
           <button class="action-button" type="button" data-action="toggle" data-id="${item.id}">
             ${item.done ? "Reopen" : "Done"}
           </button>
+          <button class="action-button" type="button" data-action="edit" data-id="${item.id}">Edit</button>
           <button class="action-button" type="button" data-action="delete" data-id="${item.id}">Delete</button>
         </div>
       </article>
@@ -191,9 +247,14 @@ function renderList(items) {
 }
 
 function matchesFilter(item) {
+  const query = search.value.trim().toLowerCase();
+  const searchableText = `${item.title} ${item.type} ${item.notes} ${item.email} ${item.phone}`.toLowerCase();
+  if (query && !searchableText.includes(query)) return false;
+
   if (filter.value === "open") return !item.done;
   if (filter.value === "done") return item.done;
   if (filter.value === "due-soon") return !item.done && isDueSoon(item);
+  if (filter.value === "overdue") return !item.done && isOverdue(item);
   return true;
 }
 
@@ -226,6 +287,10 @@ function isDueSoon(item) {
   const due = getDueDate(item);
   const warning = getWarningDate(item);
   return now >= warning && due >= now;
+}
+
+function isOverdue(item) {
+  return getDueDate(item) < new Date();
 }
 
 function startOfDay(date) {

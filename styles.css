@@ -9,6 +9,8 @@
   --accent-strong: #194d40;
   --warning: #b7503a;
   --warning-soft: #ffe2d8;
+  --danger: #8f2f2f;
+  --danger-soft: #f8d9d5;
   --done: #e5efe8;
   --shadow: 0 20px 60px rgba(45, 38, 27, 0.12);
   font-family: "Segoe UI", "Aptos", Arial, sans-serif;
@@ -103,6 +105,13 @@ button {
   gap: 1rem;
 }
 
+.list-tools {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 8rem;
+  gap: 0.5rem;
+  min-width: min(100%, 22rem);
+}
+
 .reminder-form,
 .reminder-form label {
   display: grid;
@@ -181,6 +190,12 @@ legend {
   font-weight: 800;
 }
 
+.form-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+}
+
 .primary-button {
   background: var(--accent);
   color: #fff;
@@ -195,7 +210,7 @@ legend {
 
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -219,6 +234,11 @@ legend {
 .stat-panel.urgent {
   border-color: #e8aa97;
   background: var(--warning-soft);
+}
+
+.stat-panel.danger {
+  border-color: #cf817b;
+  background: var(--danger-soft);
 }
 
 .calendar-panel,
@@ -292,6 +312,11 @@ legend {
   border-color: #db8d77;
 }
 
+.reminder-card.overdue {
+  border-color: #c05e58;
+  background: #fff6f4;
+}
+
 .reminder-title {
   margin: 0;
   font-size: 1rem;
@@ -326,6 +351,11 @@ legend {
   color: var(--warning);
 }
 
+.badge.danger {
+  border-color: #c05e58;
+  color: var(--danger);
+}
+
 .actions {
   align-content: start;
   justify-content: end;
@@ -350,6 +380,10 @@ legend {
   display: none;
 }
 
+.hidden {
+  display: none !important;
+}
+
 @media (max-width: 900px) {
   .app-header,
   .app-shell {
@@ -372,7 +406,9 @@ legend {
   }
 
   .field-row,
-  .overview-grid {
+  .overview-grid,
+  .list-tools,
+  .form-actions {
     grid-template-columns: 1fr;
   }
 

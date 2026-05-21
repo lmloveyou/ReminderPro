@@ -23,6 +23,8 @@
         </div>
 
         <form id="reminderForm" class="reminder-form">
+          <input id="editingId" type="hidden">
+
           <label>
             Title
             <input id="title" name="title" type="text" placeholder="Doctor appointment" required>
@@ -91,7 +93,10 @@
             <textarea id="notes" name="notes" rows="3" placeholder="What do you need to remember?"></textarea>
           </label>
 
-          <button class="primary-button" type="submit">Add reminder</button>
+          <div class="form-actions">
+            <button class="primary-button" id="submitButton" type="submit">Add reminder</button>
+            <button class="ghost-button hidden" id="cancelEditButton" type="button">Cancel edit</button>
+          </div>
         </form>
       </section>
 
@@ -103,6 +108,10 @@
         <article class="stat-panel urgent">
           <span class="stat-label">Due soon</span>
           <strong id="dueSoonCount">0</strong>
+        </article>
+        <article class="stat-panel danger">
+          <span class="stat-label">Overdue</span>
+          <strong id="overdueCount">0</strong>
         </article>
         <article class="stat-panel">
           <span class="stat-label">Done</span>
@@ -124,12 +133,16 @@
             <p class="eyebrow">All reminders</p>
             <h2 id="listTitle">Reminder list</h2>
           </div>
-          <select id="filter">
-            <option value="all">All</option>
-            <option value="open">Open</option>
-            <option value="due-soon">Due soon</option>
-            <option value="done">Done</option>
-          </select>
+          <div class="list-tools">
+            <input id="search" type="search" placeholder="Search reminders">
+            <select id="filter">
+              <option value="all">All</option>
+              <option value="open">Open</option>
+              <option value="due-soon">Due soon</option>
+              <option value="overdue">Overdue</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
         </div>
         <div id="emptyState" class="empty-state">
           Add your first reminder to start building your day.
