@@ -330,7 +330,8 @@ legend {
 }
 
 .badge-row,
-.actions {
+.actions,
+.utility-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -360,6 +361,11 @@ legend {
   align-content: start;
   justify-content: end;
   min-width: 11rem;
+}
+
+.utility-bar {
+  justify-content: end;
+  margin-bottom: 0.9rem;
 }
 
 .action-button {
@@ -419,5 +425,9 @@ legend {
   .actions {
     justify-content: start;
     min-width: 0;
+  }
+
+  .utility-bar {
+    justify-content: start;
   }
 }

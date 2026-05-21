@@ -9,6 +9,10 @@ const search = document.querySelector("#search");
 const notificationButton = document.querySelector("#notificationButton");
 const submitButton = document.querySelector("#submitButton");
 const cancelEditButton = document.querySelector("#cancelEditButton");
+const exportButton = document.querySelector("#exportButton");
+const importButton = document.querySelector("#importButton");
+const importFile = document.querySelector("#importFile");
+const clearDoneButton = document.querySelector("#clearDoneButton");
 
 const fields = {
   editingId: document.querySelector("#editingId"),
@@ -31,6 +35,7 @@ const notifiedReminderIds = new Set();
 setDefaultDateTime();
 render();
 setInterval(checkNotifications, 30000);
+registerServiceWorker();
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -78,6 +83,10 @@ form.addEventListener("submit", (event) => {
 filter.addEventListener("change", render);
 search.addEventListener("input", render);
 cancelEditButton.addEventListener("click", resetForm);
+exportButton.addEventListener("click", exportReminders);
+importButton.addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", importReminders);
+clearDoneButton.addEventListener("click", clearCompletedReminders);
 
 notificationButton.addEventListener("click", async () => {
   if (!("Notification" in window)) {
@@ -124,6 +133,82 @@ function loadReminders() {
 
 function saveReminders() {
   localStorage.setItem(storageKey, JSON.stringify(reminders));
+}
+
+function exportReminders() {
+  const exportData = {
+    app: "ReminderPro",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    reminders
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `reminderpro-${formatDateInput(new Date())}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importReminders(event) {
+  const [file] = event.target.files;
+  if (!file) return;
+
+  try {
+    const data = JSON.parse(await file.text());
+    const importedReminders = Array.isArray(data) ? data : data.reminders;
+    if (!Array.isArray(importedReminders)) {
+      throw new Error("The selected file does not contain reminders.");
+    }
+
+    reminders = mergeReminders(reminders, importedReminders.filter(isValidReminder));
+    saveReminders();
+    render();
+  } catch (error) {
+    alert(error.message || "Could not import reminders.");
+  } finally {
+    importFile.value = "";
+  }
+}
+
+function mergeReminders(currentReminders, importedReminders) {
+  const byId = new Map(currentReminders.map((item) => [item.id, item]));
+  importedReminders.forEach((item) => {
+    const id = item.id || crypto.randomUUID();
+    byId.set(id, {
+      id,
+      title: String(item.title || "").trim(),
+      type: item.type || "task",
+      leadTime: Number(item.leadTime || 0),
+      date: item.date,
+      time: item.time,
+      email: item.email || "",
+      phone: item.phone || "",
+      notes: item.notes || "",
+      channels: Array.isArray(item.channels) ? item.channels : ["app"],
+      done: Boolean(item.done),
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt
+    });
+  });
+  return [...byId.values()];
+}
+
+function isValidReminder(item) {
+  return item && item.title && item.date && item.time;
+}
+
+function clearCompletedReminders() {
+  const completedCount = reminders.filter((item) => item.done).length;
+  if (completedCount === 0) return;
+
+  const confirmed = confirm(`Delete ${completedCount} completed reminder${completedCount === 1 ? "" : "s"}?`);
+  if (!confirmed) return;
+
+  reminders = reminders.filter((item) => !item.done);
+  saveReminders();
+  render();
 }
 
 function setDefaultDateTime() {
@@ -342,4 +427,13 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("service-worker.js").catch(() => {
+      // The app still works without offline caching.
+    });
+  });
 }

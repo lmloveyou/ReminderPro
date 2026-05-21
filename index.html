@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#2f6f5e">
+    <meta name="description" content="A smart reminder calendar for tasks, appointments, and important things you do not want to forget.">
     <title>ReminderPro</title>
+    <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -143,6 +146,12 @@
               <option value="done">Done</option>
             </select>
           </div>
+        </div>
+        <div class="utility-bar" aria-label="Reminder tools">
+          <button class="action-button" id="exportButton" type="button">Export</button>
+          <button class="action-button" id="importButton" type="button">Import</button>
+          <button class="action-button" id="clearDoneButton" type="button">Clear done</button>
+          <input class="hidden" id="importFile" type="file" accept="application/json">
         </div>
         <div id="emptyState" class="empty-state">
           Add your first reminder to start building your day.

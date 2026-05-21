@@ -8,7 +8,11 @@ The goal is to send automatic reminders through app notifications, email, and SM
 
 This first version is a static web app. It stores reminders in the browser with local storage and can show browser notifications while the app is open.
 
-Open `index.html` in a browser to try it.
+Open `index.html` in a browser to try it locally, or run the Node server:
+
+```bash
+npm start
+```
 
 Current features:
 
@@ -17,6 +21,18 @@ Current features:
 - Filter by all, open, due soon, overdue, or done.
 - See reminder counts for open, due soon, overdue, and done items.
 - Open email and SMS drafts from a reminder.
+- Export and import reminders as JSON.
+- Install as a lightweight web app in supported browsers.
+
+## Railway deployment
+
+The project is ready for Railway.
+
+Railway can use:
+
+- Build command: `npm run build`
+- Start command: `npm start`
+- Health check path: `/health`
 
 ## MVP
 

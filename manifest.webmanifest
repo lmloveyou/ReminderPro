@@ -1,0 +1,17 @@
+{
+  "name": "ReminderPro",
+  "short_name": "ReminderPro",
+  "description": "A smart reminder calendar for tasks, appointments, and important things you do not want to forget.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f4ed",
+  "theme_color": "#2f6f5e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "reminderpro",
+  "version": "1.0.0",
+  "description": "A smart reminder calendar for tasks, appointments, and important things you do not want to forget.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node --check server.js && node --check app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "reminders",
+    "calendar",
+    "tasks"
+  ],
+  "license": "MIT"
+}
