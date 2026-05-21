@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ReminderPro</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Reminder calendar</p>
+        <h1>ReminderPro</h1>
+      </div>
+      <button class="ghost-button" id="notificationButton" type="button">Enable alerts</button>
+    </header>
+
+    <main class="app-shell">
+      <section class="panel form-panel" aria-labelledby="formTitle">
+        <div class="section-heading">
+          <p class="eyebrow">New reminder</p>
+          <h2 id="formTitle">Add something important</h2>
+        </div>
+
+        <form id="reminderForm" class="reminder-form">
+          <label>
+            Title
+            <input id="title" name="title" type="text" placeholder="Doctor appointment" required>
+          </label>
+
+          <div class="field-row">
+            <label>
+              Type
+              <select id="type" name="type">
+                <option value="task">Task</option>
+                <option value="appointment">Appointment</option>
+                <option value="important">Important</option>
+              </select>
+            </label>
+            <label>
+              Warn me
+              <select id="leadTime" name="leadTime">
+                <option value="0">At the time</option>
+                <option value="10">10 minutes before</option>
+                <option value="60">1 hour before</option>
+                <option value="1440">1 day before</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>
+              Date
+              <input id="date" name="date" type="date" required>
+            </label>
+            <label>
+              Time
+              <input id="time" name="time" type="time" required>
+            </label>
+          </div>
+
+          <fieldset>
+            <legend>Send warning by</legend>
+            <label class="check-row">
+              <input id="channelApp" type="checkbox" value="app" checked>
+              App notification
+            </label>
+            <label class="check-row">
+              <input id="channelEmail" type="checkbox" value="email">
+              Email
+            </label>
+            <label class="check-row">
+              <input id="channelSms" type="checkbox" value="sms">
+              SMS
+            </label>
+          </fieldset>
+
+          <div class="field-row">
+            <label>
+              Email address
+              <input id="email" name="email" type="email" placeholder="you@example.com">
+            </label>
+            <label>
+              Phone number
+              <input id="phone" name="phone" type="tel" placeholder="+324...">
+            </label>
+          </div>
+
+          <label>
+            Notes
+            <textarea id="notes" name="notes" rows="3" placeholder="What do you need to remember?"></textarea>
+          </label>
+
+          <button class="primary-button" type="submit">Add reminder</button>
+        </form>
+      </section>
+
+      <section class="overview-grid" aria-label="Reminder overview">
+        <article class="stat-panel">
+          <span class="stat-label">Open</span>
+          <strong id="openCount">0</strong>
+        </article>
+        <article class="stat-panel urgent">
+          <span class="stat-label">Due soon</span>
+          <strong id="dueSoonCount">0</strong>
+        </article>
+        <article class="stat-panel">
+          <span class="stat-label">Done</span>
+          <strong id="doneCount">0</strong>
+        </article>
+      </section>
+
+      <section class="panel calendar-panel" aria-labelledby="calendarTitle">
+        <div class="section-heading">
+          <p class="eyebrow">Next 7 days</p>
+          <h2 id="calendarTitle">Calendar</h2>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </section>
+
+      <section class="panel list-panel" aria-labelledby="listTitle">
+        <div class="section-heading split-heading">
+          <div>
+            <p class="eyebrow">All reminders</p>
+            <h2 id="listTitle">Reminder list</h2>
+          </div>
+          <select id="filter">
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="due-soon">Due soon</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div id="emptyState" class="empty-state">
+          Add your first reminder to start building your day.
+        </div>
+        <div id="reminderList" class="reminder-list"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

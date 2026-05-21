@@ -1,0 +1,387 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f4ed;
+  --panel: #fffdf8;
+  --ink: #1f2520;
+  --muted: #6b716b;
+  --line: #d9d2c4;
+  --accent: #2f6f5e;
+  --accent-strong: #194d40;
+  --warning: #b7503a;
+  --warning-soft: #ffe2d8;
+  --done: #e5efe8;
+  --shadow: 0 20px 60px rgba(45, 38, 27, 0.12);
+  font-family: "Segoe UI", "Aptos", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background:
+    linear-gradient(135deg, rgba(47, 111, 94, 0.13), transparent 34rem),
+    var(--bg);
+  color: var(--ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1rem 1rem;
+}
+
+.app-header h1,
+.section-heading h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.app-header h1 {
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  line-height: 0.95;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--accent-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 390px) minmax(0, 1fr);
+  gap: 1rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.panel,
+.stat-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.form-panel {
+  grid-row: span 3;
+  align-self: start;
+  padding: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.section-heading {
+  margin-bottom: 1rem;
+}
+
+.split-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.reminder-form,
+.reminder-form label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.reminder-form {
+  gap: 0.9rem;
+}
+
+.reminder-form label,
+fieldset {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.7rem 0.75rem;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  outline: 3px solid rgba(47, 111, 94, 0.25);
+  outline-offset: 2px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+fieldset {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.8rem;
+}
+
+legend {
+  padding: 0 0.35rem;
+  color: var(--accent-strong);
+}
+
+.check-row {
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.55rem !important;
+  font-weight: 600 !important;
+}
+
+.check-row input {
+  width: auto;
+}
+
+.primary-button,
+.ghost-button,
+.action-button {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  min-height: 2.6rem;
+  padding: 0.65rem 0.9rem;
+  font-weight: 800;
+}
+
+.primary-button {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ghost-button,
+.action-button {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.stat-panel {
+  padding: 1rem;
+}
+
+.stat-panel strong {
+  display: block;
+  font-size: 2.1rem;
+  line-height: 1;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.stat-panel.urgent {
+  border-color: #e8aa97;
+  background: var(--warning-soft);
+}
+
+.calendar-panel,
+.list-panel {
+  padding: 1rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.day-card {
+  min-height: 8.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.day-card.today {
+  border-color: var(--accent);
+}
+
+.day-name {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.day-number {
+  display: block;
+  margin: 0.25rem 0 0.75rem;
+  font-size: 1.6rem;
+  font-weight: 900;
+}
+
+.calendar-item {
+  display: block;
+  margin-top: 0.35rem;
+  border-left: 3px solid var(--accent);
+  padding-left: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.reminder-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.reminder-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.9rem;
+}
+
+.reminder-card.done {
+  background: var(--done);
+}
+
+.reminder-card.due-soon {
+  border-color: #db8d77;
+}
+
+.reminder-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.meta,
+.notes {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.badge-row,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.25rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.badge.alert {
+  border-color: #db8d77;
+  color: var(--warning);
+}
+
+.actions {
+  align-content: start;
+  justify-content: end;
+  min-width: 11rem;
+}
+
+.action-button {
+  min-height: 2.2rem;
+  padding: 0.45rem 0.65rem;
+  text-decoration: none;
+}
+
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.empty-state.hidden {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app-header,
+  .app-shell {
+    max-width: 720px;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .form-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .field-row,
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reminder-card {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    justify-content: start;
+    min-width: 0;
+  }
+}
