@@ -17,6 +17,7 @@ npm start
 Current features:
 
 - Create, edit, complete, and delete reminders.
+- Repeat reminders every day or every week.
 - Search reminders by title, type, notes, email, or phone.
 - Filter by all, open, due soon, overdue, or done.
 - See reminder counts for open, due soon, overdue, and done items.
@@ -29,7 +30,16 @@ Current features:
 
 The project is ready for Railway.
 
-Railway can use:
+Steps:
+
+1. Go to Railway and create a new project.
+2. Choose deploy from GitHub.
+3. Select the `ReminderPro` repository.
+4. Add the variables below.
+5. Deploy the service.
+6. Generate a public domain for the service.
+
+Railway should use:
 
 - Build command: `npm run build`
 - Start command: `npm start`
@@ -50,14 +60,17 @@ For SMS:
 
 Optional:
 
-- `DATA_DIR` for the reminder JSON file location, useful with a Railway volume.
+- `DATA_DIR=/app/data` if you add a Railway volume mounted at `/app/data`.
 - `NOTIFICATION_INTERVAL_MS` to change how often the server checks reminders. Default: `60000`.
 
 Email reminders use Resend's server API. SMS reminders use Twilio's Messages API. Keep all keys only in Railway variables, never in frontend files.
 
+For persistent reminders, add a Railway volume and mount it to `/app/data`. Without a volume, reminders can be lost after redeploys.
+
 ## MVP
 
 - Add tasks and appointments with a date and time.
+- Repeat reminders for habits and chores, such as running every day at 08:00 or cleaning every Monday.
 - View reminders in a calendar-style interface.
 - Mark reminders as open or completed.
 - Receive email or SMS warning messages before something is due.

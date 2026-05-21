@@ -121,6 +121,7 @@ async function mergeAndWriteReminders(incoming) {
       email: item.email || "",
       phone: item.phone || "",
       notes: item.notes || "",
+      recurrence: normalizeRecurrence(item.recurrence, item.date),
       channels: normalizeChannels(item.channels),
       done: Boolean(item.done),
       createdAt: item.createdAt || existing.createdAt || new Date().toISOString(),
@@ -163,6 +164,11 @@ async function processReminderNotifications() {
       } else {
         console.error("SMS notification failed:", result.error);
       }
+    }
+
+    if (isRecurring(reminder) && allSelectedNotificationsSent(reminder)) {
+      advanceRecurringReminder(reminder);
+      changed = true;
     }
   }
 
@@ -245,11 +251,73 @@ function buildReminderMessage(reminder) {
   return `ReminderPro: ${reminder.title} is due ${due}.${reminder.notes ? `\n\n${reminder.notes}` : ""}`;
 }
 
+function isRecurring(reminder) {
+  return reminder.recurrence?.frequency === "daily" || reminder.recurrence?.frequency === "weekly";
+}
+
+function allSelectedNotificationsSent(reminder) {
+  return normalizeChannels(reminder.channels).every((channel) => reminder.sentNotifications?.[channel]);
+}
+
+function advanceRecurringReminder(reminder) {
+  const nextDue = getNextRecurringDueDate(reminder);
+  reminder.date = formatDateInput(nextDue);
+  reminder.time = formatTimeInput(nextDue);
+  reminder.sentNotifications = {};
+  reminder.updatedAt = new Date().toISOString();
+}
+
+function getNextRecurringDueDate(reminder) {
+  const now = new Date();
+  const nextDue = new Date(`${reminder.date}T${reminder.time}`);
+  const frequency = reminder.recurrence?.frequency;
+
+  if (frequency === "daily") {
+    do {
+      nextDue.setDate(nextDue.getDate() + 1);
+    } while (nextDue <= now);
+    return nextDue;
+  }
+
+  if (frequency === "weekly") {
+    do {
+      nextDue.setDate(nextDue.getDate() + 7);
+    } while (nextDue <= now);
+    return nextDue;
+  }
+
+  return nextDue;
+}
+
+function normalizeRecurrence(recurrence, date) {
+  if (!recurrence || recurrence.frequency === "none") {
+    return { frequency: "none" };
+  }
+  if (recurrence.frequency === "daily") {
+    return { frequency: "daily" };
+  }
+  if (recurrence.frequency === "weekly") {
+    const weekday = Number.isInteger(recurrence.weekday)
+      ? recurrence.weekday
+      : new Date(`${date}T00:00`).getDay();
+    return { frequency: "weekly", weekday };
+  }
+  return { frequency: "none" };
+}
+
 function normalizeChannels(channels) {
   const allowedChannels = Array.isArray(channels)
     ? channels.filter((channel) => channel === "email" || channel === "sms")
     : [];
   return allowedChannels.length > 0 ? allowedChannels : ["email"];
+}
+
+function formatDateInput(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatTimeInput(date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function send(response, statusCode, body, contentType) {

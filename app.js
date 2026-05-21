@@ -24,6 +24,7 @@ const fields = {
   leadTime: document.querySelector("#leadTime"),
   date: document.querySelector("#date"),
   time: document.querySelector("#time"),
+  repeat: document.querySelector("#repeat"),
   email: document.querySelector("#email"),
   phone: document.querySelector("#phone"),
   notes: document.querySelector("#notes"),
@@ -70,6 +71,7 @@ form.addEventListener("submit", (event) => {
     leadTime: Number(fields.leadTime.value),
     date: fields.date.value,
     time: fields.time.value,
+    recurrence: buildRecurrence(),
     email,
     phone,
     notes: fields.notes.value.trim(),
@@ -243,6 +245,7 @@ function mergeReminders(currentReminders, importedReminders) {
       email: item.email || "",
       phone: item.phone || "",
       notes: item.notes || "",
+      recurrence: normalizeRecurrence(item.recurrence, item.date),
       channels: normalizeChannels(item.channels),
       done: Boolean(item.done),
       createdAt: item.createdAt || existing.createdAt || new Date().toISOString(),
@@ -293,6 +296,7 @@ function startEdit(reminder) {
   fields.leadTime.value = String(reminder.leadTime);
   fields.date.value = reminder.date;
   fields.time.value = reminder.time;
+  fields.repeat.value = reminder.recurrence?.frequency || "none";
   fields.email.value = reminder.email;
   fields.phone.value = reminder.phone;
   fields.notes.value = reminder.notes;
@@ -353,6 +357,7 @@ function renderList(items) {
     const dueDate = getDueDate(item);
     const dueSoon = isDueSoon(item);
     const overdue = isOverdue(item);
+    const recurrenceLabel = formatRecurrence(item.recurrence);
     const channels = item.channels.map((channel) => `<span class="badge">${channel.toUpperCase()}</span>`).join("");
     const emailLink = item.email
       ? `<a class="action-button" href="${buildMailto(item)}">Email</a>`
@@ -370,6 +375,7 @@ function renderList(items) {
           <div class="badge-row">
             ${dueSoon && !item.done ? '<span class="badge alert">DUE SOON</span>' : ""}
             ${overdue && !item.done ? '<span class="badge danger">OVERDUE</span>' : ""}
+            ${recurrenceLabel ? `<span class="badge">${escapeHtml(recurrenceLabel)}</span>` : ""}
             ${channels}
           </div>
         </div>
@@ -474,6 +480,43 @@ function normalizeChannels(channels) {
     ? channels.filter((channel) => channel === "email" || channel === "sms")
     : [];
   return allowedChannels.length > 0 ? allowedChannels : ["email"];
+}
+
+function buildRecurrence() {
+  const frequency = fields.repeat.value;
+  if (frequency === "daily") {
+    return { frequency: "daily" };
+  }
+  if (frequency === "weekly") {
+    return {
+      frequency: "weekly",
+      weekday: getDueDate({ date: fields.date.value, time: fields.time.value }).getDay()
+    };
+  }
+  return { frequency: "none" };
+}
+
+function normalizeRecurrence(recurrence, date) {
+  if (!recurrence || recurrence.frequency === "none") {
+    return { frequency: "none" };
+  }
+  if (recurrence.frequency === "daily") {
+    return { frequency: "daily" };
+  }
+  if (recurrence.frequency === "weekly") {
+    const weekday = Number.isInteger(recurrence.weekday)
+      ? recurrence.weekday
+      : new Date(`${date}T00:00`).getDay();
+    return { frequency: "weekly", weekday };
+  }
+  return { frequency: "none" };
+}
+
+function formatRecurrence(recurrence) {
+  if (!recurrence || recurrence.frequency === "none") return "";
+  if (recurrence.frequency === "daily") return "EVERY DAY";
+  if (recurrence.frequency === "weekly") return "EVERY WEEK";
+  return "";
 }
 
 function registerServiceWorker() {
