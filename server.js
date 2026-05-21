@@ -121,7 +121,7 @@ async function mergeAndWriteReminders(incoming) {
       email: item.email || "",
       phone: item.phone || "",
       notes: item.notes || "",
-      channels: Array.isArray(item.channels) ? item.channels : ["app"],
+      channels: normalizeChannels(item.channels),
       done: Boolean(item.done),
       createdAt: item.createdAt || existing.createdAt || new Date().toISOString(),
       updatedAt: item.updatedAt || existing.updatedAt,
@@ -243,6 +243,13 @@ function getWarningDate(reminder) {
 function buildReminderMessage(reminder) {
   const due = new Date(`${reminder.date}T${reminder.time}`).toLocaleString();
   return `ReminderPro: ${reminder.title} is due ${due}.${reminder.notes ? `\n\n${reminder.notes}` : ""}`;
+}
+
+function normalizeChannels(channels) {
+  const allowedChannels = Array.isArray(channels)
+    ? channels.filter((channel) => channel === "email" || channel === "sms")
+    : [];
+  return allowedChannels.length > 0 ? allowedChannels : ["email"];
 }
 
 function send(response, statusCode, body, contentType) {

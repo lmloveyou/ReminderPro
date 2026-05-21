@@ -10,7 +10,6 @@ const reminderList = document.querySelector("#reminderList");
 const emptyState = document.querySelector("#emptyState");
 const filter = document.querySelector("#filter");
 const search = document.querySelector("#search");
-const notificationButton = document.querySelector("#notificationButton");
 const submitButton = document.querySelector("#submitButton");
 const cancelEditButton = document.querySelector("#cancelEditButton");
 const exportButton = document.querySelector("#exportButton");
@@ -28,27 +27,42 @@ const fields = {
   email: document.querySelector("#email"),
   phone: document.querySelector("#phone"),
   notes: document.querySelector("#notes"),
-  channelApp: document.querySelector("#channelApp"),
   channelEmail: document.querySelector("#channelEmail"),
   channelSms: document.querySelector("#channelSms")
 };
 
 let reminders = loadReminders();
-const notifiedReminderIds = new Set();
 
 setDefaultDateTime();
 render();
 syncFromServer();
-setInterval(checkNotifications, 30000);
 registerServiceWorker();
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const channels = [];
-  if (fields.channelApp.checked) channels.push("app");
   if (fields.channelEmail.checked) channels.push("email");
   if (fields.channelSms.checked) channels.push("sms");
+  const email = fields.email.value.trim();
+  const phone = fields.phone.value.trim();
+
+  if (channels.length === 0) {
+    alert("Choose Email, SMS, or both.");
+    return;
+  }
+
+  if (channels.includes("email") && !email) {
+    alert("Add an email address for email reminders.");
+    fields.email.focus();
+    return;
+  }
+
+  if (channels.includes("sms") && !phone) {
+    alert("Add a phone number for SMS reminders.");
+    fields.phone.focus();
+    return;
+  }
 
   const reminderData = {
     title: fields.title.value.trim(),
@@ -56,8 +70,8 @@ form.addEventListener("submit", (event) => {
     leadTime: Number(fields.leadTime.value),
     date: fields.date.value,
     time: fields.time.value,
-    email: fields.email.value.trim(),
-    phone: fields.phone.value.trim(),
+    email,
+    phone,
     notes: fields.notes.value.trim(),
     channels
   };
@@ -92,16 +106,6 @@ exportButton.addEventListener("click", exportReminders);
 importButton.addEventListener("click", () => importFile.click());
 importFile.addEventListener("change", importReminders);
 clearDoneButton.addEventListener("click", clearCompletedReminders);
-
-notificationButton.addEventListener("click", async () => {
-  if (!("Notification" in window)) {
-    alert("Your browser does not support notifications.");
-    return;
-  }
-
-  const permission = await Notification.requestPermission();
-  notificationButton.textContent = permission === "granted" ? "Alerts enabled" : "Enable alerts";
-});
 
 reminderList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
@@ -239,7 +243,7 @@ function mergeReminders(currentReminders, importedReminders) {
       email: item.email || "",
       phone: item.phone || "",
       notes: item.notes || "",
-      channels: Array.isArray(item.channels) ? item.channels : ["app"],
+      channels: normalizeChannels(item.channels),
       done: Boolean(item.done),
       createdAt: item.createdAt || existing.createdAt || new Date().toISOString(),
       updatedAt: item.updatedAt || existing.updatedAt,
@@ -275,7 +279,7 @@ function setDefaultDateTime() {
 function resetForm() {
   form.reset();
   fields.editingId.value = "";
-  fields.channelApp.checked = true;
+  fields.channelEmail.checked = true;
   submitButton.textContent = "Add reminder";
   cancelEditButton.classList.add("hidden");
   document.querySelector("#formTitle").textContent = "Add something important";
@@ -292,7 +296,6 @@ function startEdit(reminder) {
   fields.email.value = reminder.email;
   fields.phone.value = reminder.phone;
   fields.notes.value = reminder.notes;
-  fields.channelApp.checked = reminder.channels.includes("app");
   fields.channelEmail.checked = reminder.channels.includes("email");
   fields.channelSms.checked = reminder.channels.includes("sms");
   submitButton.textContent = "Save changes";
@@ -306,7 +309,6 @@ function render() {
   renderStats(sorted);
   renderCalendar(sorted);
   renderList(sorted);
-  checkNotifications();
 }
 
 function renderStats(items) {
@@ -397,22 +399,6 @@ function matchesFilter(item) {
   return true;
 }
 
-function checkNotifications() {
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-
-  reminders.forEach((item) => {
-    if (item.done || !item.channels.includes("app")) return;
-    const warningTime = getWarningDate(item);
-    const now = new Date();
-    if (now >= warningTime && !notifiedReminderIds.has(item.id)) {
-      new Notification("ReminderPro", {
-        body: `${item.title} is due ${formatDateTime(getDueDate(item))}.`
-      });
-      notifiedReminderIds.add(item.id);
-    }
-  });
-}
-
 function getDueDate(item) {
   return new Date(`${item.date}T${item.time}`);
 }
@@ -481,6 +467,13 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function normalizeChannels(channels) {
+  const allowedChannels = Array.isArray(channels)
+    ? channels.filter((channel) => channel === "email" || channel === "sms")
+    : [];
+  return allowedChannels.length > 0 ? allowedChannels : ["email"];
 }
 
 function registerServiceWorker() {
