@@ -1,4 +1,5 @@
 const { createServer } = require("node:http");
+const { randomBytes, scryptSync, timingSafeEqual } = require("node:crypto");
 const { mkdir, readFile, writeFile } = require("node:fs/promises");
 const { extname, join, normalize } = require("node:path");
 
@@ -7,6 +8,7 @@ const publicDir = __dirname;
 const dataDir = process.env.DATA_DIR || join(__dirname, "data");
 const remindersFile = join(dataDir, "reminders.json");
 const notificationIntervalMs = Number(process.env.NOTIFICATION_INTERVAL_MS || 60000);
+let dbPool = null;
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -25,7 +27,12 @@ const server = createServer(async (request, response) => {
 
   const url = new URL(request.url, `http://${request.headers.host}`);
   if (url.pathname.startsWith("/api/")) {
-    await handleApi(request, response, url);
+    try {
+      await handleApi(request, response, url);
+    } catch (error) {
+      console.error("API error:", error.message);
+      sendJson(response, 500, { error: "Server error. Check Railway variables and database connection." });
+    }
     return;
   }
 
@@ -46,14 +53,19 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`ReminderPro is running on port ${port}`);
-});
+startServer();
 
-setInterval(processReminderNotifications, notificationIntervalMs);
-processReminderNotifications().catch((error) => {
-  console.error("Notification worker failed:", error.message);
-});
+async function startServer() {
+  await initDatabase();
+  server.listen(port, () => {
+    console.log(`ReminderPro is running on port ${port}`);
+  });
+
+  setInterval(processReminderNotifications, notificationIntervalMs);
+  processReminderNotifications().catch((error) => {
+    console.error("Notification worker failed:", error.message);
+  });
+}
 
 async function handleApi(request, response, url) {
   if (request.method === "GET" && url.pathname === "/api/config") {
@@ -64,20 +76,223 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/me") {
+    const user = await getAuthenticatedUser(request);
+    if (!user) return sendJson(response, 401, { error: "Not signed in" });
+    sendJson(response, 200, { user: publicUser(user) });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/register") {
+    const body = await readJsonBody(request);
+    const result = await registerUser(body);
+    if (!result.ok) return sendJson(response, result.status, { error: result.error });
+    setSessionCookie(response, result.sessionId);
+    sendJson(response, 200, { user: publicUser(result.user) });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/login") {
+    const body = await readJsonBody(request);
+    const result = await loginUser(body);
+    if (!result.ok) return sendJson(response, result.status, { error: result.error });
+    setSessionCookie(response, result.sessionId);
+    sendJson(response, 200, { user: publicUser(result.user) });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/logout") {
+    await deleteSession(getCookie(request, "session"));
+    clearSessionCookie(response);
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/reminders") {
-    sendJson(response, 200, { reminders: await readReminders() });
+    const user = await getAuthenticatedUser(request);
+    if (!user) return sendJson(response, 401, { error: "Not signed in" });
+    sendJson(response, 200, { reminders: await readReminders(user.id) });
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/reminders/sync") {
+    const user = await getAuthenticatedUser(request);
+    if (!user) return sendJson(response, 401, { error: "Not signed in" });
     const body = await readJsonBody(request);
     const incoming = Array.isArray(body.reminders) ? body.reminders : [];
-    const saved = await mergeAndWriteReminders(incoming);
+    const saved = await mergeAndWriteReminders(user.id, incoming);
     sendJson(response, 200, { reminders: saved });
     return;
   }
 
   sendJson(response, 404, { error: "Not found" });
+}
+
+async function initDatabase() {
+  if (!process.env.DATABASE_URL) {
+    console.warn("DATABASE_URL is missing. Accounts require a Railway PostgreSQL database.");
+    return;
+  }
+
+  const { Pool } = await import("pg");
+  dbPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined
+  });
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      phone TEXT DEFAULT '',
+      password_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS reminders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      type TEXT NOT NULL,
+      lead_time INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      email TEXT DEFAULT '',
+      phone TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      recurrence JSONB DEFAULT '{"frequency":"none"}',
+      channels TEXT[] DEFAULT ARRAY['email'],
+      done BOOLEAN DEFAULT FALSE,
+      sent_notifications JSONB DEFAULT '{}',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ
+    );
+  `);
+}
+
+async function query(sql, params = []) {
+  if (!dbPool) throw new Error("Database is not configured. Add Railway PostgreSQL and DATABASE_URL.");
+  return dbPool.query(sql, params);
+}
+
+async function registerUser(body) {
+  if (!dbPool) return { ok: false, status: 503, error: "Database is not configured. Add Railway PostgreSQL." };
+  const email = String(body.email || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  const name = String(body.name || email.split("@")[0] || "ReminderPro user").trim();
+  const phone = String(body.phone || "").trim();
+
+  if (!email || !password) return { ok: false, status: 400, error: "Email and password are required." };
+  if (password.length < 8) return { ok: false, status: 400, error: "Password must be at least 8 characters." };
+
+  const salt = randomBytes(16).toString("hex");
+  const passwordHash = hashPassword(password, salt);
+  const user = {
+    id: randomBytes(16).toString("hex"),
+    name,
+    email,
+    phone,
+    password_hash: passwordHash,
+    salt
+  };
+
+  try {
+    await query(
+      "INSERT INTO users (id, name, email, phone, password_hash, salt) VALUES ($1, $2, $3, $4, $5, $6)",
+      [user.id, user.name, user.email, user.phone, user.password_hash, user.salt]
+    );
+  } catch (error) {
+    if (error.code === "23505") return { ok: false, status: 409, error: "This email already has an account." };
+    throw error;
+  }
+
+  const sessionId = await createSession(user.id);
+  return { ok: true, user, sessionId };
+}
+
+async function loginUser(body) {
+  if (!dbPool) return { ok: false, status: 503, error: "Database is not configured. Add Railway PostgreSQL." };
+  const email = String(body.email || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  const result = await query("SELECT * FROM users WHERE email = $1", [email]);
+  const user = result.rows[0];
+  if (!user || !verifyPassword(password, user.salt, user.password_hash)) {
+    return { ok: false, status: 401, error: "Email or password is incorrect." };
+  }
+
+  const sessionId = await createSession(user.id);
+  return { ok: true, user, sessionId };
+}
+
+async function createSession(userId) {
+  const sessionId = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
+  await query("INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)", [sessionId, userId, expiresAt]);
+  return sessionId;
+}
+
+async function deleteSession(sessionId) {
+  if (!sessionId || !dbPool) return;
+  await query("DELETE FROM sessions WHERE id = $1", [sessionId]);
+}
+
+async function getAuthenticatedUser(request) {
+  const sessionId = getCookie(request, "session");
+  if (!sessionId || !dbPool) return null;
+  const result = await query(
+    `SELECT users.*
+     FROM sessions
+     JOIN users ON users.id = sessions.user_id
+     WHERE sessions.id = $1 AND sessions.expires_at > NOW()`,
+    [sessionId]
+  );
+  return result.rows[0] || null;
+}
+
+function hashPassword(password, salt) {
+  return scryptSync(password, salt, 64).toString("hex");
+}
+
+function verifyPassword(password, salt, expectedHash) {
+  const actual = Buffer.from(hashPassword(password, salt), "hex");
+  const expected = Buffer.from(expectedHash, "hex");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone || ""
+  };
+}
+
+function getCookie(request, name) {
+  const cookies = request.headers.cookie || "";
+  return cookies
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(`${name}=`))
+    ?.split("=")[1];
+}
+
+function setSessionCookie(response, sessionId) {
+  response.setHeader("Set-Cookie", [
+    `session=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`
+  ]);
+}
+
+function clearSessionCookie(response) {
+  response.setHeader("Set-Cookie", ["session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0"]);
 }
 
 async function readJsonBody(request) {
@@ -89,7 +304,12 @@ async function readJsonBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-async function readReminders() {
+async function readReminders(userId) {
+  if (dbPool && userId) {
+    const result = await query("SELECT * FROM reminders WHERE user_id = $1 ORDER BY date ASC, time ASC", [userId]);
+    return result.rows.map(rowToReminder);
+  }
+
   try {
     const content = await readFile(remindersFile, "utf8");
     const data = JSON.parse(content);
@@ -104,30 +324,70 @@ async function writeReminders(reminders) {
   await writeFile(remindersFile, JSON.stringify({ reminders }, null, 2));
 }
 
-async function mergeAndWriteReminders(incoming) {
+async function mergeAndWriteReminders(userId, incoming) {
+  if (dbPool && userId) {
+    const saved = [];
+    const validIncoming = incoming.filter(isValidReminder);
+    const incomingIds = validIncoming.map((item) => item.id);
+    if (incomingIds.length > 0) {
+      await query("DELETE FROM reminders WHERE user_id = $1 AND NOT (id = ANY($2::text[]))", [userId, incomingIds]);
+    } else {
+      await query("DELETE FROM reminders WHERE user_id = $1", [userId]);
+    }
+
+    for (const item of validIncoming) {
+      const reminder = normalizeReminder(item);
+      await query(
+        `INSERT INTO reminders (
+          id, user_id, title, type, lead_time, date, time, email, phone, notes,
+          recurrence, channels, done, sent_notifications, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          type = EXCLUDED.type,
+          lead_time = EXCLUDED.lead_time,
+          date = EXCLUDED.date,
+          time = EXCLUDED.time,
+          email = EXCLUDED.email,
+          phone = EXCLUDED.phone,
+          notes = EXCLUDED.notes,
+          recurrence = EXCLUDED.recurrence,
+          channels = EXCLUDED.channels,
+          done = EXCLUDED.done,
+          sent_notifications = reminders.sent_notifications,
+          updated_at = NOW()
+        WHERE reminders.user_id = EXCLUDED.user_id`,
+        [
+          reminder.id,
+          userId,
+          reminder.title,
+          reminder.type,
+          reminder.leadTime,
+          reminder.date,
+          reminder.time,
+          reminder.email,
+          reminder.phone,
+          reminder.notes,
+          JSON.stringify(reminder.recurrence),
+          reminder.channels,
+          reminder.done,
+          JSON.stringify(reminder.sentNotifications),
+          reminder.createdAt,
+          reminder.updatedAt
+        ]
+      );
+      saved.push(reminder);
+    }
+    return readReminders(userId);
+  }
+
   const current = await readReminders();
   const byId = new Map(current.map((item) => [item.id, item]));
 
   incoming.filter(isValidReminder).forEach((item) => {
     const existing = byId.get(item.id) || {};
-    byId.set(item.id, {
-      ...existing,
-      id: item.id,
-      title: String(item.title).trim(),
-      type: item.type || "task",
-      leadTime: Number(item.leadTime || 0),
-      date: item.date,
-      time: item.time,
-      email: item.email || "",
-      phone: item.phone || "",
-      notes: item.notes || "",
-      recurrence: normalizeRecurrence(item.recurrence, item.date),
-      channels: normalizeChannels(item.channels),
-      done: Boolean(item.done),
-      createdAt: item.createdAt || existing.createdAt || new Date().toISOString(),
-      updatedAt: item.updatedAt || existing.updatedAt,
-      sentNotifications: existing.sentNotifications || item.sentNotifications || {}
-    });
+    byId.set(item.id, { ...existing, ...normalizeReminder(item), sentNotifications: existing.sentNotifications || item.sentNotifications || {} });
   });
 
   const merged = [...byId.values()];
@@ -136,7 +396,7 @@ async function mergeAndWriteReminders(incoming) {
 }
 
 async function processReminderNotifications() {
-  const reminders = await readReminders();
+  const reminders = await readAllRemindersForNotifications();
   let changed = false;
 
   for (const reminder of reminders) {
@@ -170,11 +430,81 @@ async function processReminderNotifications() {
       advanceRecurringReminder(reminder);
       changed = true;
     }
+
+    if (dbPool && changed) {
+      await saveNotificationState(reminder);
+      changed = false;
+    }
   }
 
-  if (changed) {
+  if (changed && !dbPool) {
     await writeReminders(reminders);
   }
+}
+
+async function readAllRemindersForNotifications() {
+  if (dbPool) {
+    const result = await query("SELECT * FROM reminders WHERE done = FALSE ORDER BY date ASC, time ASC");
+    return result.rows.map(rowToReminder);
+  }
+  return readReminders();
+}
+
+async function saveNotificationState(reminder) {
+  await query(
+    `UPDATE reminders
+     SET date = $2,
+         time = $3,
+         sent_notifications = $4,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [
+      reminder.id,
+      reminder.date,
+      reminder.time,
+      JSON.stringify(reminder.sentNotifications || {})
+    ]
+  );
+}
+
+function normalizeReminder(item) {
+  return {
+    id: item.id,
+    title: String(item.title).trim(),
+    type: item.type || "task",
+    leadTime: Number(item.leadTime || 0),
+    date: item.date,
+    time: item.time,
+    email: item.email || "",
+    phone: item.phone || "",
+    notes: item.notes || "",
+    recurrence: normalizeRecurrence(item.recurrence, item.date),
+    channels: normalizeChannels(item.channels),
+    done: Boolean(item.done),
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt,
+    sentNotifications: item.sentNotifications || {}
+  };
+}
+
+function rowToReminder(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    type: row.type,
+    leadTime: row.lead_time,
+    date: row.date,
+    time: row.time,
+    email: row.email || "",
+    phone: row.phone || "",
+    notes: row.notes || "",
+    recurrence: normalizeRecurrence(row.recurrence, row.date),
+    channels: normalizeChannels(row.channels),
+    done: Boolean(row.done),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    sentNotifications: row.sent_notifications || {}
+  };
 }
 
 async function sendEmail(to, subject, text) {
@@ -329,5 +659,9 @@ function send(response, statusCode, body, contentType) {
 }
 
 function sendJson(response, statusCode, body) {
-  send(response, statusCode, JSON.stringify(body), "application/json; charset=utf-8");
+  response.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  response.end(JSON.stringify(body));
 }

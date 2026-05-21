@@ -4,6 +4,16 @@ const syncStatus = {
   syncing: false
 };
 
+const accountPanel = document.querySelector("#accountPanel");
+const accountForm = document.querySelector("#accountForm");
+const accountStatus = document.querySelector("#accountStatus");
+const registerButton = document.querySelector("#registerButton");
+const accountFields = {
+  name: document.querySelector("#accountName"),
+  email: document.querySelector("#accountEmail"),
+  phone: document.querySelector("#accountPhone"),
+  password: document.querySelector("#accountPassword")
+};
 const form = document.querySelector("#reminderForm");
 const calendarGrid = document.querySelector("#calendarGrid");
 const reminderList = document.querySelector("#reminderList");
@@ -33,11 +43,21 @@ const fields = {
 };
 
 let reminders = loadReminders();
+let currentUser = null;
 
 setDefaultDateTime();
 render();
-syncFromServer();
+loadAccount();
 registerServiceWorker();
+
+accountForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await submitAccount("login");
+});
+
+registerButton.addEventListener("click", async () => {
+  await submitAccount("register");
+});
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -150,6 +170,7 @@ function saveReminders() {
 async function syncFromServer() {
   try {
     const response = await fetch("/api/reminders");
+    if (response.status === 401) return;
     if (!response.ok) return;
 
     const data = await response.json();
@@ -166,6 +187,7 @@ async function syncFromServer() {
 }
 
 async function syncToServer() {
+  if (!currentUser) return;
   if (syncStatus.syncing) return;
   syncStatus.syncing = true;
 
@@ -190,6 +212,78 @@ async function syncToServer() {
   } finally {
     syncStatus.syncing = false;
   }
+}
+
+async function loadAccount() {
+  try {
+    const response = await fetch("/api/me");
+    if (!response.ok) {
+      showSignedOut();
+      return;
+    }
+    const data = await response.json();
+    showSignedIn(data.user);
+    await syncFromServer();
+  } catch {
+    showSignedOut();
+  }
+}
+
+async function submitAccount(mode) {
+  const payload = {
+    name: accountFields.name.value.trim(),
+    email: accountFields.email.value.trim(),
+    phone: accountFields.phone.value.trim(),
+    password: accountFields.password.value
+  };
+
+  try {
+    const response = await fetch(`/api/${mode}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      alert(data.error || "Account request failed.");
+      return;
+    }
+    accountFields.password.value = "";
+    showSignedIn(data.user);
+    await syncFromServer();
+  } catch {
+    alert("Could not connect to the account server.");
+  }
+}
+
+function showSignedIn(user) {
+  currentUser = user;
+  accountPanel.classList.add("hidden");
+  accountFields.name.value = user.name || "";
+  accountFields.email.value = user.email || "";
+  accountFields.phone.value = user.phone || "";
+  if (!fields.email.value) fields.email.value = user.email || "";
+  if (!fields.phone.value) fields.phone.value = user.phone || "";
+  accountStatus.innerHTML = `
+    <span class="meta">${escapeHtml(user.name || user.email)}</span>
+    <button class="ghost-button" id="logoutButton" type="button">Sign out</button>
+  `;
+  document.querySelector("#logoutButton").addEventListener("click", logout);
+}
+
+function showSignedOut() {
+  currentUser = null;
+  accountPanel.classList.remove("hidden");
+  accountStatus.innerHTML = "";
+}
+
+async function logout() {
+  await fetch("/api/logout", { method: "POST" });
+  currentUser = null;
+  reminders = [];
+  localStorage.removeItem(storageKey);
+  render();
+  showSignedOut();
 }
 
 function exportReminders() {
@@ -283,6 +377,8 @@ function resetForm() {
   form.reset();
   fields.editingId.value = "";
   fields.channelEmail.checked = true;
+  fields.email.value = currentUser?.email || "";
+  fields.phone.value = currentUser?.phone || "";
   submitButton.textContent = "Add reminder";
   cancelEditButton.classList.add("hidden");
   document.querySelector("#formTitle").textContent = "Add something important";

@@ -78,6 +78,25 @@ button {
   padding: 1rem;
 }
 
+.account-panel {
+  max-width: 1180px;
+  margin: 0 auto 1rem;
+  padding: 1rem;
+}
+
+.account-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.account-status {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 0.5rem;
+  min-height: 2.6rem;
+}
+
 .panel,
 .stat-panel {
   border: 1px solid var(--line);

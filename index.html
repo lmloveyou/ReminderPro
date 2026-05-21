@@ -15,7 +15,42 @@
         <p class="eyebrow">Reminder calendar</p>
         <h1>ReminderPro</h1>
       </div>
+      <div class="account-status" id="accountStatus"></div>
     </header>
+
+    <section class="account-panel panel" id="accountPanel" aria-labelledby="accountTitle">
+      <div class="section-heading">
+        <p class="eyebrow">Account</p>
+        <h2 id="accountTitle">Sign in to save your reminders</h2>
+      </div>
+      <form id="accountForm" class="account-form">
+        <div class="field-row">
+          <label>
+            Name
+            <input id="accountName" name="name" type="text" placeholder="Your name">
+          </label>
+          <label>
+            Email
+            <input id="accountEmail" name="email" type="email" placeholder="you@example.com" required>
+          </label>
+        </div>
+        <div class="field-row">
+          <label>
+            Phone
+            <input id="accountPhone" name="phone" type="tel" placeholder="+324...">
+          </label>
+          <label>
+            Password
+            <input id="accountPassword" name="password" type="password" minlength="8" required>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="primary-button" id="registerButton" type="button">Create account</button>
+          <button class="ghost-button" id="loginButton" type="submit">Sign in</button>
+        </div>
+        <p class="meta">Your saved email and phone are used automatically for new reminders.</p>
+      </form>
+    </section>
 
     <main class="app-shell">
       <section class="panel form-panel" aria-labelledby="formTitle">
