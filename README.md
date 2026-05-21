@@ -1,2 +1,13 @@
 # ReminderPro
-The app works like a calendar/to-do tool, but with extra control: you add tasks, appointments, or things you must not forget, and the app automatically sends a warning
+
+ReminderPro is a smart reminder calendar for tasks, appointments, and important things you do not want to forget.
+
+The goal is to send automatic reminders through app notifications, email, and SMS.
+
+## MVP
+
+- Add tasks and appointments with a date and time.
+- View reminders in a calendar-style interface.
+- Mark reminders as open or completed.
+- Receive warning messages before something is due.
+- Add email reminders first, then SMS reminders later.
